@@ -1,0 +1,30 @@
+{
+  "levels": {
+    "minimal": {
+      "level": 20,
+      "description": "Minimal logging - only errors and critical messages",
+      "enabled_levels": ["ERROR", "CRITICAL"]
+    },
+    "normal": {
+      "level": 20,
+      "description": "Normal logging - errors, warnings, and info messages",
+      "enabled_levels": ["INFO", "WARNING", "ERROR", "CRITICAL"]
+    },
+    "verbose": {
+      "level": 10,
+      "description": "Verbose logging - debug, info, warnings, and errors",
+      "enabled_levels": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+    },
+    "debug": {
+      "level": 10,
+      "description": "Debug logging - all messages including debug",
+      "enabled_levels": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+    }
+  },
+  "default_level": "normal",
+  "component_overrides": {
+    "storyspark.agent": "verbose",
+    "storyspark.tool": "normal",
+    "storyspark.model": "debug"
+  }
+}

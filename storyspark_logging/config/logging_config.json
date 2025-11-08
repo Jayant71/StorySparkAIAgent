@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {
+    "json": {
+      "class": "storyspark_logging.formatters.json_formatter.JSONFormatter"
+    },
+    "console": {
+      "class": "storyspark_logging.formatters.console_formatter.ConsoleFormatter"
+    },
+    "verbose": {
+      "class": "storyspark_logging.formatters.verbose_formatter.VerboseFormatter"
+    }
+  },
+  "handlers": {
+    "console": {
+      "class": "storyspark_logging.handlers.console_handler.ConsoleHandler",
+      "level": "DEBUG",
+      "formatter": "console",
+      "stream": "ext://sys.stdout"
+    },
+    "file": {
+      "class": "storyspark_logging.handlers.file_handler.FileHandler",
+      "level": "DEBUG",
+      "formatter": "json",
+      "filename": "logs/storyspark.log",
+      "maxBytes": 10485760,
+      "backupCount": 5
+    },
+    "verbose_file": {
+      "class": "storyspark_logging.handlers.file_handler.FileHandler",
+      "level": "DEBUG",
+      "formatter": "verbose",
+      "filename": "logs/storyspark_verbose.log",
+      "maxBytes": 5242880,
+      "backupCount": 3
+    }
+  },
+  "loggers": {
+    "storyspark": {
+      "level": "DEBUG",
+      "handlers": ["console", "file"],
+      "propagate": false
+    },
+    "storyspark.agent": {
+      "level": "INFO",
+      "handlers": ["console", "file"],
+      "propagate": false
+    },
+    "storyspark.tool": {
+      "level": "WARNING",
+      "handlers": ["console", "file"],
+      "propagate": false
+    },
+    "storyspark.model": {
+      "level": "DEBUG",
+      "handlers": ["console", "file", "verbose_file"],
+      "propagate": false
+    },
+    "storyspark.performance": {
+      "level": "INFO",
+      "handlers": ["file"],
+      "propagate": false
+    }
+  },
+  "root": {
+    "level": "WARNING",
+    "handlers": ["console"]
+  }
+}
