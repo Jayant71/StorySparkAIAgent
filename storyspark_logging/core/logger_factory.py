@@ -132,10 +132,14 @@ class LoggerFactory:
         storyspark_logger.setLevel(logging.DEBUG)
         storyspark_logger.addHandler(console_handler)
         storyspark_logger.addHandler(file_handler)
+        storyspark_logger.propagate = False
 
         # Configure other loggers
         agent_logger = logging.getLogger("storyspark.agent")
         agent_logger.setLevel(logging.INFO)
+
+        main_logger = logging.getLogger("storyspark.main")
+        main_logger.setLevel(logging.INFO)
 
         tool_logger = logging.getLogger("storyspark.tool")
         tool_logger.setLevel(logging.WARNING)
@@ -206,6 +210,7 @@ class LoggerFactory:
         # Map verbose level to logging level
         level_mapping = {
             'minimal': logging.ERROR,
+            'warning': logging.WARNING,
             'normal': logging.INFO,
             'verbose': logging.DEBUG,
             'debug': logging.DEBUG

@@ -5,6 +5,11 @@
       "description": "Minimal logging - only errors and critical messages",
       "enabled_levels": ["ERROR", "CRITICAL"]
     },
+    "warning": {
+      "level": 30,
+      "description": "Warning logging - warnings, errors, and critical messages",
+      "enabled_levels": ["WARNING", "ERROR", "CRITICAL"]
+    },
     "normal": {
       "level": 20,
       "description": "Normal logging - errors, warnings, and info messages",
@@ -21,10 +26,11 @@
       "enabled_levels": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
     }
   },
-  "default_level": "normal",
+  "default_level": "warning",
   "component_overrides": {
-    "storyspark.agent": "verbose",
-    "storyspark.tool": "normal",
-    "storyspark.model": "debug"
+    "storyspark.agent": "normal",
+    "storyspark.main": "normal",
+    "storyspark.tool": "warning",
+    "storyspark.model": "warning"
   }
 }

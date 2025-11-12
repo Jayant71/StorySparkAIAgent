@@ -36,7 +36,7 @@ class PerformanceTracker:
     def __enter__(self):
         """Enter the context and start timing."""
         self.start_time = time.perf_counter()
-        self.logger.log(self.log_level, f"Started operation: {self.operation}")
+        self.logger.log(logging.DEBUG, f"Started operation: {self.operation}")
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):

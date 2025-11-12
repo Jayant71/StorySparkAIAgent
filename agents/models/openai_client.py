@@ -104,7 +104,63 @@ def create_openai_model(model_name: str = "zai-org/GLM-4.6", temperature: float 
 
 if __name__ == "__main__":
     import dotenv
+    from schemas.story_schemas import StoryOutline, ChapterContent
     dotenv.load_dotenv()
-    openai_model = create_openai_model()
-    response = openai_model.invoke("Hello, how are you?")
-    print(response.content)
+
+    # # Test with StoryOutline schema
+    # print("Testing OpenAI model with StoryOutline schema...")
+    # story_model = create_openai_model(
+    #     model_name="gpt-4.1-2025-04-14",
+    #     temperature=0.7,
+    #     schema=StoryOutline
+    # )
+
+    # story_prompt = """Create a story outline for a children's adventure novel aimed at 6-8 year olds.
+    # Theme: Friendship and courage
+    # Number of chapters: 3
+
+    # Provide:
+    # 1. Story title
+    # 2. Main characters (2-3) with detailed descriptions
+    # 3. Chapter-by-chapter outline with titles and summaries"""
+
+    # try:
+    #     story_response = story_model.invoke(story_prompt)
+    #     print("\nStory Outline Response:")
+    #     print(f"Type of response: {type(story_response)}")
+    #     print(story_response.model_dump_json(indent=2))
+
+    # except Exception as e:
+    #     print(f"Error testing StoryOutline schema: {e}")
+
+    # Test with ChapterContent schema
+    print("\n\nTesting OpenAI model with ChapterContent schema...")
+    chapter_model = create_openai_model(
+        model_name="gpt-4.1-2025-04-14",
+        temperature=0.7,
+        schema=ChapterContent
+    )
+
+    chapter_prompt = """Write Chapter 1 for a children's story aimed at 6-8 year olds.
+
+    Chapter Outline: A young squirrel named Squeaky discovers a magical nut that can talk.
+
+    Characters: Squeaky - a curious young squirrel, Nutmeg - a wise magical nut
+
+    Previous Chapters: None
+
+    Requirements:
+    - Age-appropriate language and themes
+    - 500-800 words
+    - Include descriptive scenes for potential illustrations
+    - IDENTIFY EXACTLY 2-3 STRATEGIC ILLUSTRATION OPPORTUNITIES by marking them with [ILLUSTRATION: brief description] tags
+
+    Provide the chapter title and complete chapter content."""
+
+    try:
+        chapter_response = chapter_model.invoke(chapter_prompt)
+        print("\nChapter Content Response:")
+        print(f"Type of response: {type(chapter_response)}")
+        print(chapter_response.model_dump_json(indent=2))
+    except Exception as e:
+        print(f"Error testing ChapterContent schema: {e}")

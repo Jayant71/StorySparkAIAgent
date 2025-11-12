@@ -32,6 +32,190 @@ class LaTeXGeneratorTool(BaseTool):
         self.logger = LoggerFactory().get_logger("storyspark.tools.pdf.latex")
         self.logger.info("LaTeXGeneratorTool initialized")
 
+    def _generate_chapters_latex(self, chapters, output_directory):
+        """Generate LaTeX content for all chapters with embedded images."""
+        self.logger.debug("Generating chapters LaTeX content", extra={
+            "chapter_count": len(chapters)
+        })
+
+        chapters_content = []
+
+        for i, chapter in enumerate(chapters, 1):
+            chapter_title = chapter.get('title', f'Chapter {i}')
+            chapter_content = chapter.get('content', '')
+
+            if chapter_content:
+                content_length = len(chapter_content)
+            else:
+                content_length = 0
+                self.logger.warning(f"Empty content for chapter {i}")
+
+            self.logger.debug("Processing chapter for LaTeX", extra={
+                "chapter_number": i,
+                "chapter_title": chapter_title,
+                "content_length": content_length
+            })
+
+            # Process illustrations in content
+            processed_content = self._process_illustrations(
+                chapter_content, chapter.get('images', []), output_directory)
+
+            # Generate chapter LaTeX
+            chapter_latex = f"""
+\\chapter{{{chapter_title}}}
+
+{processed_content}
+"""
+            chapters_content.append(chapter_latex)
+
+        return '\n'.join(chapters_content)
+
+    def _process_illustrations(self, content, images, output_directory):
+        """Replace [ILLUSTRATION: description] placeholders with actual LaTeX image commands."""
+        import re
+
+        # Handle different image formats with improved path resolution
+        image_paths = []
+        
+        # Ensure images directory exists
+        images_dir = os.path.join(output_directory, "images")
+        if not os.path.exists(images_dir):
+            os.makedirs(images_dir, exist_ok=True)
+        
+        if images and isinstance(images[0], dict):
+            # Images is list of dicts
+            for img in images:
+                path = img.get('path', img.get('filename', ''))
+                if path:
+                    resolved_path = self._resolve_image_path(path, output_directory, images_dir)
+                    if resolved_path:  # Only append if path is valid (not None)
+                        image_paths.append(resolved_path)
+        elif images and isinstance(images[0], str):
+            # Images is list of strings (paths)
+            for path in images:
+                resolved_path = self._resolve_image_path(path, output_directory, images_dir)
+                if resolved_path:  # Only append if path is valid (not None)
+                    image_paths.append(resolved_path)
+
+        self.logger.debug("Processed image paths", extra={
+            "image_count": len(image_paths),
+            "image_paths": image_paths
+        })
+
+        # Collect all illustration descriptions in order
+        illustrations = []
+        pattern = r'\[ILLUSTRATION:\s*(.*?)\]'
+        for match in re.finditer(pattern, content, flags=re.IGNORECASE):
+            desc = match.group(1).strip()
+            illustrations.append(desc)
+
+        self.logger.debug("Found illustrations in content", extra={
+            "illustration_count": len(illustrations),
+            "illustrations": illustrations
+        })
+
+        # Assign images to illustrations in order
+        image_index = 0
+        def replace_illustration(match):
+            nonlocal image_index
+            desc = match.group(1).strip()
+
+            if image_index < len(image_paths):
+                img_path = image_paths[image_index]
+                image_index += 1
+                self.logger.debug("Assigned image to illustration", extra={
+                    "description": desc,
+                    "image_path": img_path,
+                    "image_index": image_index - 1
+                })
+                return f"""
+\\begin{{figure}}[H]
+\\centering
+\\includegraphics[width=0.8\\textwidth]{{{img_path}}}
+\\caption{{{desc}}}
+\\end{{figure}}
+"""
+            else:
+                # Check if we can find any missing images in the images directory
+                if image_index == 0 and os.path.exists(images_dir):
+                    # Try to find any images that might match this chapter
+                    import glob
+                    chapter_pattern = f"chapter_*_illustration_{image_index + 1}.png"
+                    found_images = glob.glob(os.path.join(images_dir, chapter_pattern))
+                    if found_images:
+                        img_path = os.path.relpath(found_images[0], output_directory).replace('\\', '/')
+                        image_index += 1
+                        self.logger.info(f"Found missing image for illustration: {img_path}", extra={
+                            "description": desc,
+                            "image_path": img_path
+                        })
+                        return f"""
+\\begin{{figure}}[H]
+\\centering
+\\includegraphics[width=0.8\\textwidth]{{{img_path}}}
+\\caption{{{desc}}}
+\\end{{figure}}
+"""
+                
+                self.logger.warning("No more images available for illustration", extra={
+                    "description": desc,
+                    "available_images": len(image_paths),
+                    "images_dir_exists": os.path.exists(images_dir)
+                })
+                return f"\\textit{{[Illustration: {desc}]}}"
+
+        # Replace all illustrations
+        processed_content = re.sub(pattern, replace_illustration, content, flags=re.IGNORECASE)
+
+        return processed_content
+    
+    def _resolve_image_path(self, path, output_directory, images_dir):
+        """Resolve image path with multiple fallback strategies"""
+        try:
+            # If path is already a relative path from output_directory, use it directly
+            if not os.path.isabs(path) and not path.startswith('images/'):
+                # Try direct path first
+                direct_path = os.path.join(output_directory, path)
+                if os.path.exists(direct_path):
+                    rel_path = os.path.relpath(direct_path, output_directory)
+                    return rel_path.replace('\\', '/')
+            
+            # Try the path as given
+            if os.path.exists(path):
+                rel_path = os.path.relpath(path, output_directory)
+                return rel_path.replace('\\', '/')
+            
+            # Try in images directory
+            filename = os.path.basename(path)
+            images_path = os.path.join(images_dir, filename)
+            if os.path.exists(images_path):
+                return f"images/{filename}"
+            
+            # Try common naming patterns
+            base_name = os.path.splitext(filename)[0]
+            for ext in ['.png', '.jpg', '.jpeg']:
+                test_path = os.path.join(images_dir, base_name + ext)
+                if os.path.exists(test_path):
+                    return f"images/{base_name + ext}"
+            
+            # If all else fails, return None to indicate no valid image found
+            self.logger.warning(f"Image file not found: {filename}", extra={
+                "original_path": path,
+                "tried_paths": [
+                    path,
+                    os.path.join(output_directory, path),
+                    images_path
+                ]
+            })
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error resolving image path: {e}", extra={
+                "path": path
+            })
+            # Return None to indicate failure
+            return None
+
     def _run(self, state_json_path: str, output_tex_path: str) -> str:
         self.logger.info("LaTeXGeneratorTool._run() invoked", extra={
             "state_json_path": state_json_path,
@@ -61,7 +245,8 @@ class LaTeXGeneratorTool(BaseTool):
                             "default_directory": directory
                         })
                         # Update the file path to include the directory
-                        output_tex_path = os.path.join(directory, os.path.basename(output_tex_path))
+                        output_tex_path = os.path.join(
+                            directory, os.path.basename(output_tex_path))
                         self.logger.debug("Updated output_tex_path with directory", extra={
                             "new_output_tex_path": output_tex_path
                         })
@@ -73,7 +258,8 @@ class LaTeXGeneratorTool(BaseTool):
                             "default_directory": directory
                         })
                         # Update the file path to include the directory
-                        output_tex_path = os.path.join(directory, os.path.basename(output_tex_path))
+                        output_tex_path = os.path.join(
+                            directory, os.path.basename(output_tex_path))
                         self.logger.debug("Updated output_tex_path with current directory", extra={
                             "new_output_tex_path": output_tex_path
                         })
@@ -101,7 +287,7 @@ class LaTeXGeneratorTool(BaseTool):
                 })
 
                 try:
-                    with open(state_json_path, 'r') as f:
+                    with open(state_json_path, 'r', encoding='utf-8') as f:
                         novel_state = json.load(f)
                 except FileNotFoundError as e:
                     ErrorEnhancer.log_error(
@@ -125,8 +311,8 @@ class LaTeXGeneratorTool(BaseTool):
                     raise
 
                 state_size = len(json.dumps(novel_state))
-                # Use written_chapters for content generation
-                written_chapters = novel_state.get('written_chapters', [])
+                # Use chapters for content generation
+                written_chapters = novel_state.get('chapters', [])
                 chapter_count = len(written_chapters)
                 self.logger.info("Novel state loaded successfully", extra={
                     "state_size_bytes": state_size,
@@ -134,72 +320,55 @@ class LaTeXGeneratorTool(BaseTool):
                     "title": novel_state.get('title', 'Unknown')
                 })
 
-                # Create LaTeX document
-                self.logger.debug("Creating LaTeX document structure")
-                doc = Document(documentclass='book')
+                # Read LaTeX template
+                template_path = os.path.join(os.path.dirname(
+                    __file__), '..', 'templates', 'main.tex')
+                self.logger.debug("Reading LaTeX template", extra={
+                    "template_path": template_path
+                })
 
-                # Add title page and preamble
-                doc.preamble.append(NoEscape(r'\\usepackage{graphicx}'))
-                doc.preamble.append(NoEscape(r'\\usepackage[utf8]{inputenc}'))
-                doc.append(NoEscape(r'\\title{' + novel_state['title'] + '}'))
-                doc.append(NoEscape(r'\\author{Generated by AI}'))
-                doc.append(NoEscape(r'\\date{\\today}'))
-                doc.append(NoEscape(r'\\maketitle'))
-                self.logger.debug("LaTeX document preamble and title page added")
+                try:
+                    with open(template_path, 'r', encoding='utf-8') as f:
+                        template_content = f.read()
+                except FileNotFoundError as e:
+                    ErrorEnhancer.log_error(
+                        self.logger,
+                        e,
+                        context={
+                            "operation": "template_reading",
+                            "template_path": template_path
+                        }
+                    )
+                    raise
 
-                # Process written chapters
-                total_images = 0
-                for i, chapter in enumerate(written_chapters, 1):
-                    chapter_title = chapter.get('title', f'Chapter {i}')
-                    self.logger.debug("Processing chapter", extra={
-                        "chapter_number": i,
-                        "chapter_title": chapter_title,
-                        "content_length": len(chapter['content'])
-                    })
+                # Replace title placeholder
+                template_content = template_content.replace(
+                    'STORY_TITLE', novel_state['title'])
 
-                    with doc.create(Section(f"Chapter {i}: {chapter_title}")):
-                        # Add chapter content
-                        doc.append(chapter['content'])
+                # Generate chapters content
+                chapters_latex = self._generate_chapters_latex(
+                    written_chapters, directory)
+                template_content = template_content.replace(
+                    'CHAPTERS_CONTENT', chapters_latex)
 
-                        # Add images at relevant positions
-                        chapter_images = chapter.get('illustrations', [])
-                        if chapter_images:
-                            self.logger.debug("Adding images to chapter", extra={
-                                "chapter_number": chapter['number'],
-                                "image_count": len(chapter_images)
-                            })
+                # Count total images
+                total_images = sum(len(chapter.get('images', []))
+                                   for chapter in written_chapters)
 
-                        for img_info in chapter_images:
-                            try:
-                                # For now, just add a placeholder for illustrations
-                                # In the future, this could be enhanced to generate actual images
-                                doc.append(NoEscape(f'\\par\\vspace{{1em}}\\textit{{[Illustration: {img_info}]}}\\par\\vspace{{1em}}'))
-                                total_images += 1
-                                self.logger.debug("Illustration placeholder added", extra={
-                                    "illustration_text": img_info,
-                                    "chapter_number": chapter['number']
-                                })
-                            except Exception as e:
-                                self.logger.warning("Failed to add illustration placeholder", extra={
-                                    "illustration_text": img_info,
-                                    "chapter_number": chapter['number'],
-                                    "error": str(e)
-                                })
-
-                # Generate .tex file
-                tex_base_path = output_tex_path.replace('.tex', '')
-                self.logger.debug("Generating LaTeX file", extra={
+                # Write the LaTeX file
+                self.logger.debug("Writing LaTeX file", extra={
                     "output_path": output_tex_path
                 })
 
                 try:
-                    doc.generate_tex(tex_base_path)
+                    with open(output_tex_path, 'w', encoding='utf-8') as f:
+                        f.write(template_content)
                 except Exception as e:
                     ErrorEnhancer.log_error(
                         self.logger,
                         e,
                         context={
-                            "operation": "latex_file_generation",
+                            "operation": "latex_file_writing",
                             "output_path": output_tex_path
                         }
                     )
@@ -249,17 +418,17 @@ class PDFCompilerTool(BaseTool):
     def _check_pdflatex_availability(self) -> bool:
         """
         Check if pdflatex is available in the system PATH.
-        
+
         Returns:
             bool: True if pdflatex is found, False otherwise
         """
         self.logger.debug("Checking pdflatex availability")
-        
+
         try:
             # Try to find pdflatex using shutil.which (cross-platform)
             import shutil
             pdflatex_path = shutil.which('pdflatex')
-            
+
             if pdflatex_path:
                 self.logger.info("pdflatex found in system PATH", extra={
                     "pdflatex_path": pdflatex_path
@@ -271,7 +440,7 @@ class PDFCompilerTool(BaseTool):
                     "path_env": os.environ.get('PATH', 'PATH not set')
                 })
                 return False
-                
+
         except Exception as e:
             self.logger.error("Error checking pdflatex availability", extra={
                 "error": str(e)
@@ -281,15 +450,15 @@ class PDFCompilerTool(BaseTool):
     def _get_safe_working_directory(self, tex_file_path: str) -> str:
         """
         Get a safe working directory for pdflatex execution.
-        
+
         Args:
             tex_file_path: Path to the LaTeX file
-            
+
         Returns:
             str: Safe working directory path
         """
         working_dir = os.path.dirname(tex_file_path)
-        
+
         # If working_dir is empty, use current directory
         if not working_dir:
             working_dir = os.getcwd()
@@ -297,13 +466,13 @@ class PDFCompilerTool(BaseTool):
                 "original_working_dir": "",
                 "fallback_working_dir": working_dir
             })
-        
+
         # Ensure the directory exists
         if not os.path.exists(working_dir):
             error_msg = f"Working directory does not exist: {working_dir}"
             self.logger.error(error_msg)
             raise FileNotFoundError(error_msg)
-        
+
         return working_dir
 
     def _run(self, tex_file_path: str) -> str:
@@ -334,7 +503,8 @@ class PDFCompilerTool(BaseTool):
                             "default_directory": directory
                         })
                         # Update the file path to include the directory
-                        tex_file_path = os.path.join(directory, os.path.basename(tex_file_path))
+                        tex_file_path = os.path.join(
+                            directory, os.path.basename(tex_file_path))
                         self.logger.debug("Updated tex_file_path with directory", extra={
                             "new_tex_file_path": tex_file_path
                         })
@@ -346,7 +516,8 @@ class PDFCompilerTool(BaseTool):
                             "default_directory": directory
                         })
                         # Update the file path to include the directory
-                        tex_file_path = os.path.join(directory, os.path.basename(tex_file_path))
+                        tex_file_path = os.path.join(
+                            directory, os.path.basename(tex_file_path))
                         self.logger.debug("Updated tex_file_path with current directory", extra={
                             "new_tex_file_path": tex_file_path
                         })
@@ -411,8 +582,9 @@ class PDFCompilerTool(BaseTool):
 
                     try:
                         # Prepare command with proper Windows handling
-                        cmd = ['pdflatex', '-interaction=nonstopmode', tex_filename]
-                        
+                        cmd = ['pdflatex',
+                               '-interaction=nonstopmode', tex_filename]
+
                         # On Windows, we might need shell=True for some LaTeX installations
                         # but we'll try without first for security
                         shell = False
@@ -425,13 +597,13 @@ class PDFCompilerTool(BaseTool):
                                 self.logger.debug("Using shell=True for .bat file execution", extra={
                                     "pdflatex_path": pdflatex_path
                                 })
-                        
+
                         self.logger.debug("Executing pdflatex command", extra={
                             "command": cmd,
                             "shell": shell,
                             "working_directory": working_dir
                         })
-                        
+
                         result = subprocess.run(
                             cmd,
                             capture_output=True,
@@ -542,7 +714,8 @@ class PDFCompilerTool(BaseTool):
                 pdf_size = os.path.getsize(pdf_path)
                 tracker.add_metadata("tex_file_size_bytes", file_size)
                 tracker.add_metadata("pdf_file_size_bytes", pdf_size)
-                tracker.add_metadata("compilation_runs", len(compilation_results))
+                tracker.add_metadata("compilation_runs",
+                                     len(compilation_results))
 
                 self.logger.info("PDF compilation completed successfully", extra={
                     "pdf_path": pdf_path,
@@ -564,6 +737,7 @@ class PDFCompilerTool(BaseTool):
             )
             raise
 
+
 def main():
     """
     Main function to run PDF generator tools from command line.
@@ -576,13 +750,18 @@ def main():
     subparsers = parser.add_subparsers(dest='tool', help='Tool to run')
 
     # LaTeX generator subcommand
-    latex_parser = subparsers.add_parser('latex-generator', help='Generate LaTeX from novel state')
-    latex_parser.add_argument('--state-json-path', required=True, help='Path to novel state JSON file')
-    latex_parser.add_argument('--output-tex-path', required=True, help='Output LaTeX file path')
+    latex_parser = subparsers.add_parser(
+        'latex-generator', help='Generate LaTeX from novel state')
+    latex_parser.add_argument(
+        '--state-json-path', required=True, help='Path to novel state JSON file')
+    latex_parser.add_argument(
+        '--output-tex-path', required=True, help='Output LaTeX file path')
 
     # PDF compiler subcommand
-    pdf_parser = subparsers.add_parser('pdf-compiler', help='Compile LaTeX to PDF')
-    pdf_parser.add_argument('--tex-file-path', required=True, help='Path to LaTeX file')
+    pdf_parser = subparsers.add_parser(
+        'pdf-compiler', help='Compile LaTeX to PDF')
+    pdf_parser.add_argument(
+        '--tex-file-path', required=True, help='Path to LaTeX file')
 
     args = parser.parse_args()
 

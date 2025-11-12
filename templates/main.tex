@@ -1,0 +1,105 @@
+\documentclass[12pt,openany]{scrbook}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{geometry}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{setspace}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{lastpage}
+
+% Page geometry for children's books - larger margins, readable layout
+\geometry{
+    paperwidth=8.5in,
+    paperheight=11in,
+    left=1.5in,
+    right=1.5in,
+    top=1.25in,
+    bottom=1.25in,
+    headheight=0.5in,
+    footskip=0.5in
+}
+
+% Child-friendly typography - larger fonts
+\renewcommand{\normalsize}{\fontsize{12}{15}\selectfont}
+\renewcommand{\large}{\fontsize{14}{17}\selectfont}
+\renewcommand{\Large}{\fontsize{16}{19}\selectfont}
+\renewcommand{\LARGE}{\fontsize{18}{22}\selectfont}
+\renewcommand{\huge}{\fontsize{20}{24}\selectfont}
+\renewcommand{\Huge}{\fontsize{24}{28}\selectfont}
+
+% Color scheme for children's book
+\definecolor{chaptercolor}{RGB}{70,130,180}  % Steel blue for chapter titles
+\definecolor{titlecolor}{RGB}{255,69,0}      % Red orange for title
+\definecolor{authorcolor}{RGB}{34,139,34}    % Forest green for author
+
+% Chapter formatting - colorful and child-friendly
+\titleformat{\chapter}[display]
+{\normalfont\Huge\bfseries\color{chaptercolor}}
+{\chaptertitlename\ \thechapter}
+{20pt}
+{\Huge}
+[\vspace{1ex}{\color{chaptercolor}\rule{\linewidth}{2pt}}]
+
+% Section formatting
+\titleformat{\section}
+{\normalfont\large\bfseries\color{chaptercolor}}
+{\thesection}
+{1em}
+{}
+
+% Fancy headers and footers
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\leftmark}
+\fancyhead[R]{\thepage}
+\fancyfoot[L]{\footnotesize\leftmark}
+\fancyfoot[C]{}
+\fancyfoot[R]{\footnotesize\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\footrulewidth}{0.4pt}
+
+% Ensure chapters start on new pages
+\let\oldchapter\chapter
+\renewcommand{\chapter}{\clearpage\oldchapter}
+
+% Image handling - center images with captions
+
+% Title page command
+\newcommand{\storytitle}[2]{
+    \begin{titlepage}
+        \centering
+        \vspace*{2cm}
+        {\Huge\bfseries\color{titlecolor}#1\par}
+        \vspace{1cm}
+        {\Large\color{authorcolor}by #2\par}
+        \vspace{2cm}
+        {\large A Children's Storybook\par}
+        \vspace{1cm}
+        % Title illustration will be added here if available
+    \end{titlepage}
+}
+
+% Table of contents formatting
+\renewcommand{\contentsname}{\large\bfseries Table of Contents}
+
+\begin{document}
+
+% Title page
+\storytitle{STORY_TITLE}{AI Generated}
+
+% Table of contents
+\tableofcontents
+\newpage
+
+% Chapters will be inserted here
+CHAPTERS_CONTENT
+
+% Mark the last page for footer reference
+\label{LastPage}
+
+\end{document}

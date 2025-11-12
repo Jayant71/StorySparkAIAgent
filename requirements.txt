@@ -6,3 +6,5 @@ langchain-openai>=1.0.2
 pydantic==2.12.4
 pylatex==1.4.2
 colorama==0.4.6
+aiohttp==3.9.1
+Pillow==10.1.0

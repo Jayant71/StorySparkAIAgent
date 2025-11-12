@@ -8,6 +8,9 @@ class Character(BaseModel):
     description: str = Field(description="Detailed description of the character")
     age: Optional[int] = Field(default=None, description="Character's age if applicable")
     role: Optional[str] = Field(default=None, description="Character's role in the story")
+    personality: Optional[str] = Field(default=None, description="Character's personality traits")
+    appearance: Optional[str] = Field(default=None, description="Detailed physical appearance description")
+    background: Optional[str] = Field(default=None, description="Character's background story")
 
 
 class Chapter(BaseModel):

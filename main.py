@@ -5,9 +5,12 @@ from storyspark_logging.core.logger_factory import LoggerFactory
 from storyspark_logging.core.performance_tracker import PerformanceTracker
 from storyspark_logging.core.error_enhancer import ErrorEnhancer
 from utils.directory_utils import set_current_output_dir, get_current_output_dir
+from tools.story_tool import load_novel_state
 import time
 import argparse
 import sys
+import json
+import os
 
 dotenv.load_dotenv()
 
@@ -103,7 +106,7 @@ def main():
             })
 
             # Create agent
-            logger.info("Initializing NovelGenerationAgent")
+            logger.debug("Initializing NovelGenerationAgent")
             agent = NovelGenerationAgent(config)
             logger.info("NovelGenerationAgent initialized successfully")
 
@@ -121,8 +124,15 @@ def main():
 
             result = agent.generate_novel(theme=theme, title=title)
 
+            # Explicitly save the state file before PDF generation
+            state_file_path = os.path.join(config.output_dir, "novel_state.json")
+            if os.path.exists(state_file_path):
+                state = load_novel_state(state_file_path)
+                with open(state_file_path, 'w') as f:
+                    json.dump(state.model_dump(), f, indent=2)
+
             # Log completion
-            logger.info("Novel generation completed successfully", extra={
+            logger.warning("Novel generation completed successfully", extra={
                 "result_keys": list(result.keys()) if isinstance(result, dict) else str(type(result)),
                 "output_directory": config.output_dir
             })
@@ -135,10 +145,13 @@ def main():
 
         # Log total execution time
         execution_time = tracker.get_duration()
-        logger.info("Total execution completed", extra={
+        logger.warning("Total execution completed", extra={
             "total_execution_time_seconds": execution_time,
             "output_directory": output_dir
         })
+
+        # Ensure clean exit
+        sys.exit(0)
 
     except Exception as e:
         # Enhance error with context
